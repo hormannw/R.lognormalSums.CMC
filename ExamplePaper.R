@@ -1,0 +1,104 @@
+
+
+
+source("lognormalSumCMC.RCMC.R")
+
+# 1. Simple examples how to us CMC() and CMC.RIS to estimate right and left tail probabilities
+
+########################################
+# Example how to use CMC() CMC.RIS() Left Tail probabilities
+CMC(n=1.e5,gam=5,d=10,sigma=1,rho=0.2)
+CMC.RIS(n=1.e4,d=10,rho= 0.2,sigma=1,gam=5)
+CMC.RIS(n=1.e4,d=10,rho= 0.2,sigma=1,gam=5,nin=4)
+
+########################################
+# Examples how to use CMC() CMC.RIS() Right tail-probabilities
+CMC(n=1.e5,gam=15,d=10,sigma=1,rho=0.2,lower.tail=F)
+CMC.RIS(n=1.e4,d=10,rho= 0.2,sigma=1,gam=15,lower.tail=F,nin=4)
+
+
+
+
+##########################################
+# 2. Comparison example of the paper for the left tail:
+#    for 18 parameter settings d= c(4,10,30), s=c(0.25,1), rho=c(-0.5/d-1,0,0.5) 
+#    with 3 gamma (ie. threshold) for each parameter setting such that the
+#    left tail probabilities are approximately 1.e-3, 1.e-10 and 1.e-30 
+
+load(file="Ex1.parm.Rdata")) 
+#loads the 54 x 4 matrix Ex1.parm holding 54 rows with d, s, rho, gamma values
+
+
+
+
+
+ManyExperGam.m <- function(simFun=CMC,pm=Ex1.parm,n=1.e4,...){
+# makes for simulation method simFun the experiments with the parameters in pm
+# for sample size n.
+# returns a data.frame holding the input parameters and the simulated values:
+#  d    s  rho gamma          est           SE      relErr seconds (ie used CPU time)
+#  4 0.25 -0.5 3.109 1.007645e-03 1.792579e-06 0.001778979    0.06  
+resm <- NULL
+for( i in 1:length(pm$d)){
+#    	print(paste("d=",d=pm$d[i],"s=",pm$s[i],"rho=",pm$rho[i]))
+		t.0<-proc.time()[1]
+		res <- simFun(n=n,d=pm$d[i],sigma=pm$s[i],rho=ifelse(pm$rho[i]<0,pm$rho[i]/(pm$d[i]-1),pm$rho[i]),gamma = pm$gamma[i],...) 
+		resm<-rbind(resm,c(res,seconds= unname(proc.time()[1]-t.0))) 
+}
+data.frame(cbind(pm,resm))
+}
+ManyExperGam.m(simFun=CMC.RIS,pm=Ex1.parm[1:9,],n=1.e3) # 9 experiments with n only 1000
+
+# comparison experiments:
+system.time(resCMCn5 <-ManyExperGam.m(simFun=CMC,pm=Ex1.parm,n=1.e5))
+#   user  system elapsed 
+#   8.75    0.38    9.14 
+system.time(resCMC.RISnin1 <-ManyExperGam.m(simFun=CMC.RIS,pm=Ex1.parm,n=1.e4,nin=1))
+#   user  system elapsed 
+#   4.80    0.15    4.94 
+system.time(resCMC.RISnin4 <-ManyExperGam.m(simFun=CMC.RIS,pm=Ex1.parm,n=1.e4,nin=4))
+#   user  system elapsed 
+#   6.49    0.18    6.65 
+system.time(resCMC.RISnin16 <-ManyExperGam.m(simFun=CMC.RIS,pm=Ex1.parm,n=1.e4,nin=16))
+#   user  system elapsed 
+#  13.55    0.03   13.58 
+
+# comparison of the work-normalized relative error
+WNRelErr<-resCMCn5$relErr*sqrt(resCMCn5$seconds)
+c(min(WNRelErr),median(WNRelErr),max(WNRelErr)) 
+#[1] 0.0001030585 0.0010021826 0.1917518312   # WNRelErr for CMC
+WNRelErr<-resCMC.RISnin1$relErr*sqrt(resCMC.RISnin1$seconds) 
+c(min(WNRelErr),median(WNRelErr),max(WNRelErr))# CMC.RIS nin=1  
+#[1] 0.0003588892 0.0006216708 0.0031337169   
+c(min(WNRelErr),median(WNRelErr),max(WNRelErr))
+#[1] 0.0001809518 0.0003510701 0.0038021145 # WNRelErr for CMC.RIS nin=4
+WNRelErr<-resCMC.RISnin16$relErr*sqrt(resCMC.RISnin16$seconds)
+c(min(WNRelErr),median(WNRelErr),max(WNRelErr))
+#[1] 6.100326e-05 3.980605e-04 5.318426e-03 #WNRelErr for CMC.RIS nin=16
+
+
+system.time(resCMCn5 <-ManyExperGam.m(simFun=CMC,pm=Ex1.parm,n=1.e5))
+#   user  system elapsed 
+#   8.75    0.38    9.14 
+system.time(resCMC.RISnin1 <-ManyExperGam.m(simFun=CMC.RIS,pm=Ex1.parm,n=1.e4,nin=1))
+#   user  system elapsed 
+#   4.80    0.15    4.94 
+system.time(resCMC.RISnin4 <-ManyExperGam.m(simFun=CMC.RIS,pm=Ex1.parm,n=1.e4,nin=4))
+#   user  system elapsed 
+#   6.49    0.18    6.65 
+system.time(resCMC.RISnin16 <-ManyExperGam.m(simFun=CMC.RIS,pm=Ex1.parm,n=1.e4,nin=16))
+
+# comparison of the work-normalized relative error
+WNRelErr<-resCMCn5$relErr*sqrt(resCMCn5$seconds)
+c(min(WNRelErr),median(WNRelErr),max(WNRelErr)) 
+#[1] 0.0001030585 0.0010021826 0.1917518312   # WNRelErr for CMC
+WNRelErr<-resCMC.RISnin1$relErr*sqrt(resCMC.RISnin1$seconds) 
+c(min(WNRelErr),median(WNRelErr),max(WNRelErr))# CMC.RIS nin=1  
+#[1] 0.0003588892 0.0006216708 0.0031337169   
+WNRelErr<-resCMC.RISnin4$relErr*sqrt(resCMC.RISnin4$seconds) 
+c(min(WNRelErr),median(WNRelErr),max(WNRelErr))
+#[1] 0.0001809518 0.0003510701 0.0038021145 # WNRelErr for CMC.RIS nin=4
+WNRelErr<-resCMC.RISnin16$relErr*sqrt(resCMC.RISnin16$seconds)
+c(min(WNRelErr),median(WNRelErr),max(WNRelErr))
+#[1] 6.100326e-05 3.980605e-04 5.318426e-03 #WNRelErr for CMC.RIS nin=16
+
