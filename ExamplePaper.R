@@ -29,9 +29,6 @@ load(file="Ex1.parm.Rdata"))
 #loads the 54 x 4 matrix Ex1.parm holding 54 rows with d, s, rho, gamma values
 
 
-
-
-
 ManyExperGam.m <- function(simFun=CMC,pm=Ex1.parm,n=1.e4,...){
 # makes for simulation method simFun the experiments with the parameters in pm
 # for sample size n.
@@ -50,55 +47,28 @@ data.frame(cbind(pm,resm))
 ManyExperGam.m(simFun=CMC.RIS,pm=Ex1.parm[1:9,],n=1.e3) # 9 experiments with n only 1000
 
 # comparison experiments:
-system.time(resCMCn5 <-ManyExperGam.m(simFun=CMC,pm=Ex1.parm,n=1.e5))
+system.time(resCMC <-ManyExperGam.m(simFun=CMC,pm=Ex1.parm,n=1.e5)) # last about 10 seconds ( for 54 CDF estimates)
 #   user  system elapsed 
 #   8.75    0.38    9.14 
-system.time(resCMC.RISnin1 <-ManyExperGam.m(simFun=CMC.RIS,pm=Ex1.parm,n=1.e4,nin=1))
-#   user  system elapsed 
-#   4.80    0.15    4.94 
-system.time(resCMC.RISnin4 <-ManyExperGam.m(simFun=CMC.RIS,pm=Ex1.parm,n=1.e4,nin=4))
+system.time(resCMC.RIS <-ManyExperGam.m(simFun=CMC.RIS,pm=Ex1.parm,n=1.e4,nin=4))# last about 10 seconds ( for 54 CDF estimates)
 #   user  system elapsed 
 #   6.49    0.18    6.65 
-system.time(resCMC.RISnin16 <-ManyExperGam.m(simFun=CMC.RIS,pm=Ex1.parm,n=1.e4,nin=16))
-#   user  system elapsed 
-#  13.55    0.03   13.58 
 
-# comparison of the work-normalized relative error
-WNRelErr<-resCMCn5$relErr*sqrt(resCMCn5$seconds)
+# comparison of relative errors:
+
+c(min(resCMC$relErr),median(resCMC$relErr),max(resCMC$relErr))
+# [1] 0.0002320282 0.0032530798 0.2248736975
+c(min(resCMC.RIS$relErr),median(resCMC.RIS$relErr),max(resCMC.RIS$relErr))
+# [1] 0.0004258808 0.0012257987 0.0082423014
+
+
+
+
+
+# Comparison of WNRelErr (Work Normalized Relative Error
+WNRelErr<-resCMC$relErr*sqrt(resCMC$seconds) 
 c(min(WNRelErr),median(WNRelErr),max(WNRelErr)) 
 #[1] 0.0001030585 0.0010021826 0.1917518312   # WNRelErr for CMC
-WNRelErr<-resCMC.RISnin1$relErr*sqrt(resCMC.RISnin1$seconds) 
-c(min(WNRelErr),median(WNRelErr),max(WNRelErr))# CMC.RIS nin=1  
-#[1] 0.0003588892 0.0006216708 0.0031337169   
+WNRelErr<-resCMC.RIS$relErr*sqrt(resCMC.RIS$seconds) 
 c(min(WNRelErr),median(WNRelErr),max(WNRelErr))
 #[1] 0.0001809518 0.0003510701 0.0038021145 # WNRelErr for CMC.RIS nin=4
-WNRelErr<-resCMC.RISnin16$relErr*sqrt(resCMC.RISnin16$seconds)
-c(min(WNRelErr),median(WNRelErr),max(WNRelErr))
-#[1] 6.100326e-05 3.980605e-04 5.318426e-03 #WNRelErr for CMC.RIS nin=16
-
-
-system.time(resCMCn5 <-ManyExperGam.m(simFun=CMC,pm=Ex1.parm,n=1.e5))
-#   user  system elapsed 
-#   8.75    0.38    9.14 
-system.time(resCMC.RISnin1 <-ManyExperGam.m(simFun=CMC.RIS,pm=Ex1.parm,n=1.e4,nin=1))
-#   user  system elapsed 
-#   4.80    0.15    4.94 
-system.time(resCMC.RISnin4 <-ManyExperGam.m(simFun=CMC.RIS,pm=Ex1.parm,n=1.e4,nin=4))
-#   user  system elapsed 
-#   6.49    0.18    6.65 
-system.time(resCMC.RISnin16 <-ManyExperGam.m(simFun=CMC.RIS,pm=Ex1.parm,n=1.e4,nin=16))
-
-# comparison of the work-normalized relative error
-WNRelErr<-resCMCn5$relErr*sqrt(resCMCn5$seconds)
-c(min(WNRelErr),median(WNRelErr),max(WNRelErr)) 
-#[1] 0.0001030585 0.0010021826 0.1917518312   # WNRelErr for CMC
-WNRelErr<-resCMC.RISnin1$relErr*sqrt(resCMC.RISnin1$seconds) 
-c(min(WNRelErr),median(WNRelErr),max(WNRelErr))# CMC.RIS nin=1  
-#[1] 0.0003588892 0.0006216708 0.0031337169   
-WNRelErr<-resCMC.RISnin4$relErr*sqrt(resCMC.RISnin4$seconds) 
-c(min(WNRelErr),median(WNRelErr),max(WNRelErr))
-#[1] 0.0001809518 0.0003510701 0.0038021145 # WNRelErr for CMC.RIS nin=4
-WNRelErr<-resCMC.RISnin16$relErr*sqrt(resCMC.RISnin16$seconds)
-c(min(WNRelErr),median(WNRelErr),max(WNRelErr))
-#[1] 6.100326e-05 3.980605e-04 5.318426e-03 #WNRelErr for CMC.RIS nin=16
-
