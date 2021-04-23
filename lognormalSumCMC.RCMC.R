@@ -15,7 +15,7 @@ k0k1 <- function(d=50,rho=0,sigma=1){
 #k0k1(d=50,rho=0,sigma=0.2)
 
 ########################################################
-# New Clean Implementation of CMC algorithm 
+# Clean fast Implementation of CMC algorithm 
 #######################################
 calcCiv <- function(uv){
 # calculates the coefficients civ necesary to calculate the root
@@ -41,27 +41,43 @@ civm
 }
 #calcCiv(uv=rbind(c(0,1),cbind(1,2)))
 
-CMC <- function(n=1.e5,rep.out=1,gamma=0.4,d=4,sigma=1,rho=0.1,lower.tail=T){
-# simulates Prob(S < gamma) or (Prob(S > gamma) for S sum of exchangeable lognormals
+CMC <- function(n=1.e5,rep.out=1,gamma=0.4,d=4,sigma=1,rho=0.1,pdfyn=F){
+# simulates the CDF F(gamma) = Prob(S < gamma) for S sum of exchangeable lognormals
+# for pdfyn=F a vector holding the CDF-estimate its SE and the relative error is returned
+# for pdfyn=T also the pdf estimate its SE and relative error are appended
+# using pdfyn=T also pdf(gamma) is estimated
 # n ... sample size
-# rep.out ... outer repetetitions
-#      rep.out >= 100 is recommended for reliable error estimates
+# rep.out ... outer repetetitions used to reach very large sample sizes
+#     rep.out =1 or rep.out >= 100 is recommended for reliable error estimates
 # gamma ... threshold for the probabilities
 # d, sigma, rho ... parameter of the exchangeable lognormal vector
-# lower.tail ...    = T  for CDF, = F for 1 - CDF 
+# pdfyn = F ... only CDF values are calcuated, 
+#       = T ... CDF and PDF values are calculated and returned    
 
 kk <- k0k1(d=d,rho=rho,sigma=sigma) 
-res.m <- matrix(NA,nrow=rep.out,ncol=3)
+res.m <- matrix(NA,nrow=rep.out,ncol=ifelse(!pdfyn,3,6))
 for(i in 1:rep.out){
   zm1 <- matrix(rnorm((d-1)*n),nrow=n)
   civm <- calcCiv(uv=zm1)
-  res <- pnorm( kk[1]*log(gamma/rowSums(exp(-kk[2]*civm))) ,lower.tail=lower.tail)
-  res.m[i,] <- c(est<-mean(res),SE<-sd(res)/sqrt(n), SE/est)
+  root <- kk[1]*log(gamma/rowSums(exp(-kk[2]*civm)))
+  CDF <- pnorm( root)
+  if(!pdfyn){ 
+     res <- c(est=est<-mean(CDF),SE=SE<-sd(CDF)/sqrt(n),relErr=SE/est)
+	 res.m[i,] <- res
+  }else{
+     pdf <- dnorm( root)*kk[1]/gamma
+     res <- c(est=est<-mean(CDF),SE=SE<-sd(CDF)/sqrt(n),relErr=SE/est,
+						est.pdf=est.pdf<-mean(pdf),SE.pdf=SE.pdf<-sd(pdf)/sqrt(n),reEr.pdf=SE.pdf/est.pdf)
+     res.m[i,] <- res  
+  }
 }	
-if(rep.out==1) return( c(est=res.m[1,1],SE=res.m[1,2],relErr=res.m[1,3]) )
-return(  c( est = est<-mean(res.m[,1]) , SE = SE <-sd(res.m[,1])/sqrt(rep.out), relErr = SE/est)  )
+if(rep.out==1) return(res)
+res.CDF <- c( est = est<-mean(res.m[,1]) , SE = SE <-sd(res.m[,1])/sqrt(rep.out), relErr = SE/est)
+if(!pdfyn) return(res.CDF)  
+return(  c(res.CDF, est.pdf = est.pdf<-mean(res.m[,4]) , SE.pdf = SE.pdf <- sd(res.m[,4])/sqrt(rep.out), reEr.pdf = SE.pdf/est.pdf)  )
 }
-#res<-CMC(n=1.e6,gam=5,d=10,sigma=1,rho=0)
+#res<-CMC(n=1.e6,gam=5,d=10,sigma=1,rho=0,pdfyn=T)
+# CMC(n=1.e3,rep.out=1.e2,gam=.2,d=10,sigma=1,rho=-0.5/9,pdfyn=T)
 
 ####################################################
 rcivm <- function(d=5,n=2){
@@ -131,25 +147,27 @@ cbind(xv,fv)
 ###########################################################################################
 ###########################################################################################
 ###########################################################################################
-CMC.RIS <- function(n=1.e2,rep.out=1,d=11,rho= 0,sigma=1,gamma=d*0.8,lower.tail=T,nStep=5,
-                    nin=4,etnormtheta=2){
-# CMC simulation using different IS densities for Radius CMC
+CMC.RIS <- function(n=1.e2,rep.out=1,gamma=5.3,d=11,rho= 0,sigma=1,nStep=5,
+                    nin=4,etnormtheta=2,pdfyn=F){
+# estimates the CDF value F(gamma) = Prob(sumlognormal < gamma)
+# for pdfyn=F a vector holding the CDF-estimate its SE and the relative error is returned
+# for pdfyn=T also the pdf estimate its SE and relative error are appended
+# Details:
+# applies CMC.RIS using a normal-exponential tail IS density for Radius CMC
 # for one random direction "nStep"+1 evaluations of the optimal IS density
 # are used to find the mode; than for IS "nin" random variates from the 
-# etnorm (exponential tail normal distribution with exponential tail for |x| >etnormtheta )
+# etnorm distribution (normal distribution with exponential tail for |x| >etnormtheta )
 # are generated.
-#
 # nStep ... number of iterations for Newton method
-# rep.out ... outer repetetitions
-#      rep.out >= 100 is recommended for reliable error estimates
+# rep.out ... outer repetetitions used to reach very large sample sizes
+#     rep.out =1 or rep.out >= 100 is recommended for reliable error estimates
 # gamma ... threshold for the probabilities
 # d, sigma, rho ... parameter of the exchangeable lognormal vector
-# lower.tail ...    = T  for CDF, = F for 1 - CDF 
 # nin ... inner repetitions of RIS
 # etnormtheta... default= 2 (so IS density is N(0,1) for abs(z)<2 and exponential in the tails
 ############################################################
 
-CMC.RIS.sim <- function(kk=mykk,gam,civm=myciv,nStep=5,nin=4,stratyn=T,etnormtheta=2,logisticyn=F){
+CMC.RIS.sim <- function(kk=mykk,gam,civm=myciv,nStep=5,nin=4,stratyn=T,etnormtheta=2,logisticyn=F,pdfyn=F){
 # uses Newton method with nStep steps to find the mode of optIS and then makes Radius IS
 # returns a vector of n iid simulation results
 ##########
@@ -178,11 +196,13 @@ lSEcivm <- function(rv,civm,deriv=c(0,1,2)){
 }
 
 ##################################################
-optIScivmFast  <-  function(rv,kk,gam,civm){
+optIScivmFast  <-  function(rv,kk,gam,civm,pdfyn=F){
 # calculates the optimal IS density of radius IS
  d <- length(civm[1,])
  root <- kk[1]*(log(gam)-lSEcivm(-kk[2]*rv,-civm,deriv=0))
- pnorm(root,lower.tail=lower.tail)*exp(dchilog(rv,d-1))  
+ if(!pdfyn)return(pnorm(root)*exp(dchilog(rv,d-1)))
+ return(cbind(pnorm(root)*exp(dchilog(rv,d-1)),
+                dnorm(root)*exp(dchilog(rv,d-1))*kk[1]/gam ) )
 }
 
 loptIScivm <-function(rv,kk,gam,civm){
@@ -196,7 +216,7 @@ loptIScivm <-function(rv,kk,gam,civm){
  root <- kk[1]*(log(gam)-as.vector(lsem[,1]))
  droot <- kk[1]*kk[2]*as.vector(lsem[,2])
  ddroot <- -kk[1]*kk[2]^2*as.vector(lsem[,3])
- prob <- pnorm(root,lower.tail=lower.tail)
+ prob <- pnorm(root)
  dnroot <- dnorm(root)
  dlprob <- dnroot * droot / prob
  ddlprob <- (  ddnorm(root)*droot^2+dnroot*ddroot ) / prob - (dnroot * droot / prob)^2
@@ -210,19 +230,12 @@ loptIScivm <-function(rv,kk,gam,civm){
 
 n<- length(civm[,1])
 d <- length(civm[1,])
-if(lower.tail){ r <- sqrt(d-2)/2  # starting value of Newton method for left tail
+r <- sqrt(d-2)/2  # starting value of Newton method for left tail
   for(i in 1:nStep){
     ois <- loptIScivm(r,kk,gam,civm)
     step <- ois$dloIS/ois$ddloIS
     r <- r - ifelse(step<r, step, r/2) #x = x0 - f(x0)/f'(x0)
   }
-}else{ r <- sqrt(d-2)  # starting value of Newton method for left tail
-  for(i in 1:nStep){
-    ois <- loptIScivm(r,kk,gam,civm)
-    step <- ois$dloIS/ois$ddloIS
-    r <- r - ifelse(step< r+step, step, r/2) #x = x0 - f(x0)/f'(x0)
-  }}
-
  mode <- r 
  ois <- loptIScivm(mode,kk,gam,civm) 
  s_est <- sqrt(-1/ois$ddloIS)
@@ -232,7 +245,7 @@ if(lower.tail){ r <- sqrt(d-2)/2  # starting value of Newton method for left tai
     zfm <- qISetnorm(u=(i-1+runif(n))/nin , cov =covEtnorm)
 	xv <- mode + s_est*zfm[,1]# zfm[,1]... random variates of etnorm distribution 
     xv <- ifelse(xv <1.e-10,0,xv)
-    sumy <- sumy+ optIScivmFast(xv,kk=kk,gam=gam,civm)/(zfm[,2]/s_est)
+    sumy <- sumy+ optIScivmFast(xv,kk=kk,gam=gam,civm,pdfyn=pdfyn)/(zfm[,2]/s_est)
   }
  y <- sumy/nin
 }
@@ -240,28 +253,39 @@ if(lower.tail){ r <- sqrt(d-2)/2  # starting value of Newton method for left tai
 ###################
 # "main code of the function
  kk <- k0k1(d=d,rho=rho,sigma=sigma)
- res.m <- matrix(NA,nrow=rep.out,ncol=3)
+ res.m <- matrix(NA,nrow=rep.out,ncol=ifelse(!pdfyn,3,6))
  for(i in 1:rep.out){
    civm <- rcivm(d=d,n=n)
-   y <- CMC.RIS.sim(kk,gam=gamma,civm,nStep=nStep,nin=nin,etnormtheta=etnormtheta)
-   res.m[i,] <- c(est<-mean(y),SE<-sd(y)/sqrt(n), SE/est)
+   y <- CMC.RIS.sim(kk,gam=gamma,civm,nStep=nStep,nin=nin,etnormtheta=etnormtheta,pdfyn=pdfyn)
+#   res.m[i,] <- c(est<-mean(y),SE<-sd(y)/sqrt(n), SE/est)
+  if(!pdfyn){ 
+     res <- c(est=est<-mean(y),SE=SE<-sd(y)/sqrt(n),relErr=SE/est)
+	 res.m[i,] <- res
+  }else{
+     CDF <- y[,1]
+     pdf <- y[,2]
+     res <- c(est=est<-mean(CDF),SE=SE<-sd(CDF)/sqrt(n),relErr=SE/est,
+						est.pdf=est.pdf<-mean(pdf),SE.pdf=SE.pdf<-sd(pdf)/sqrt(n),reEr.pdf=SE.pdf/est.pdf)
+     res.m[i,] <- res  
+  }
+
  }
- if(rep.out==1) return( c(est=res.m[1,1],SE=res.m[1,2],relErr=res.m[1,3]) )
- return(  c( est = est<-mean(res.m[,1]) , SE = SE <-sd(res.m[,1])/sqrt(rep.out), relErr = SE/est)  )
+ if(rep.out==1) return(res)
+ res.CDF <- c( est = est<-mean(res.m[,1]) , SE = SE <-sd(res.m[,1])/sqrt(rep.out), relErr = SE/est)
+ if(!pdfyn) return(res.CDF)  
+ return(  c(res.CDF, est.pdf = est.pdf<-mean(res.m[,4]) , SE.pdf = SE.pdf <- sd(res.m[,4])/sqrt(rep.out), reEr.pdf = SE.pdf/est.pdf)  )
 }
 ##############################################
 
 ########################################
-# Example how to use CMC() CMC.RIS() Left Tail probabilities
+# Example how to use CMC() CMC.RIS()   only CDF values
 # CMC(n=1.e5,gam=5,d=10,sigma=1,rho=0.2)
-# CMC.RIS(n=1.e4,d=10,rho= 0.2,sigma=1,gam=5,nin=4)
+# CMC.RIS(n=1.e4,gam=5,d=10,rho= 0.2,sigma=1,nin=4)
 
 ########################################
-# Examples how to use CMC() CMC.RIS() Right tail-probabilities
-# CMC(n=1.e5,gam=15,d=10,sigma=1,rho=0.2,lower.tail=F)
-# CMC.RIS(n=1.e4,d=10,rho= 0.2,sigma=1,gam=15,lower.tail=F,nin=4)
-
-
+# Example how to use CMC() CMC.RIS()   CDF and pdf values
+# CMC(n=1.e5,gam=2,d=10,sigma=1,rho=0.2,pdfyn=T)
+# CMC.RIS(n=1.e4,gam=2,d=10,rho= 0.2,sigma=1,nin=4,pdfyn=T)
 
 
 

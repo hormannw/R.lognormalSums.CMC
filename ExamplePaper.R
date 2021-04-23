@@ -8,13 +8,8 @@ source("lognormalSumCMC.RCMC.R")
 ########################################
 # Example how to use CMC() CMC.RIS() Left Tail probabilities
 CMC(n=1.e5,gam=5,d=10,sigma=1,rho=0.2)
-CMC.RIS(n=1.e4,d=10,rho= 0.2,sigma=1,gam=5)
-CMC.RIS(n=1.e4,d=10,rho= 0.2,sigma=1,gam=5,nin=4)
-
-########################################
-# Examples how to use CMC() CMC.RIS() Right tail-probabilities
-CMC(n=1.e5,gam=15,d=10,sigma=1,rho=0.2,lower.tail=F)
-CMC.RIS(n=1.e4,d=10,rho= 0.2,sigma=1,gam=15,lower.tail=F,nin=4)
+CMC.RIS(n=1.e4,gam=5,d=10,rho= 0.2,sigma=1)
+CMC.RIS(n=1.e4,gam=5,d=10,rho= 0.2,sigma=1,nin=10)# uses a larger number of RIS repetitions
 
 
 
@@ -61,10 +56,6 @@ c(min(resCMC$relErr),median(resCMC$relErr),max(resCMC$relErr))
 c(min(resCMC.RIS$relErr),median(resCMC.RIS$relErr),max(resCMC.RIS$relErr))
 # [1] 0.0004258808 0.0012257987 0.0082423014
 
-
-
-
-
 # Comparison of WNRelErr (Work Normalized Relative Error
 WNRelErr<-resCMC$relErr*sqrt(resCMC$seconds) 
 c(min(WNRelErr),median(WNRelErr),max(WNRelErr)) 
@@ -72,3 +63,43 @@ c(min(WNRelErr),median(WNRelErr),max(WNRelErr))
 WNRelErr<-resCMC.RIS$relErr*sqrt(resCMC.RIS$seconds) 
 c(min(WNRelErr),median(WNRelErr),max(WNRelErr))
 #[1] 0.0001809518 0.0003510701 0.0038021145 # WNRelErr for CMC.RIS nin=4
+
+
+################################
+# Experiments to compare the relative errors of CDF and pdf estimates.
+
+ManyExperCDFpdf.m <- function(simFun=CMC,pm=Ex1.parm,n=1.e4,...){
+# makes for simulation method simFun the experiments with the parameters in pm
+# for sample size n.
+# returns a data.frame holding the input parameters and the simulated values of CDF and pdf:
+CDFm <- pdfm <- NULL
+for( i in 1:length(pm$d)){
+#    	print(paste("d=",d=pm$d[i],"s=",pm$s[i],"rho=",pm$rho[i]))
+		t.0<-proc.time()[1]
+		res <- simFun(n=n,d=pm$d[i],sigma=pm$s[i],rho=ifelse(pm$rho[i]<0,pm$rho[i]/(pm$d[i]-1),pm$rho[i]),gamma = pm$gamma[i],...) 
+		CDFm<-rbind(CDFm,c(res[1:3])) 
+		pdfm<-rbind(pdfm,c(res[4:6],seconds= unname(proc.time()[1]-t.0))) 
+}
+data.frame(cbind(CDFm,pdfm))
+}
+# Experiment to demonstrate the behaviour of the PDF-estimates of CMC.RIS:
+res<-ManyExperCDFpdf.m(simFun=CMC.RIS,pm=Ex1.parm,n=1.e5,pdfyn=T)
+# to checks if the relative errors of pdf and CDF estimates are similar:
+max(res$relErr/res$reEr.pdf)
+#[1] 1.056486
+min(res$relErr/res$reEr.pdf)
+#[1] 0.9659838
+
+
+# Experiment to demonstrate the behaviour of the PDF-estimates of CMC:
+res<-ManyExperCDFpdf.m(simFun=CMC,pm=Ex1.parm,n=1.e6,pdfyn=T)
+# to check if the relative errors of pdf and CDF estimates are similar:
+max(res$relErr/res$reEr.pdf)
+#[1] 1.182084
+min(res$relErr/res$reEr.pdf)
+#[1] 1.005113
+
+ 
+
+
+
